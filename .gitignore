@@ -365,3 +365,7 @@ FodyWeavers.xsd
 *.vcxproj
 *.vcxproj
 *.filters
+
+src/gfx/*.c
+src/gfx/*.h
+src/gfx/convimg.yaml.lst

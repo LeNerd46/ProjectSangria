@@ -1,0 +1,36 @@
+palettes:
+  - name: global_palette
+    fixed-entries:
+      - color: {index: 0, r: 0, g: 0, b: 0}
+      - color: {index: 1, r: 255, g: 227, b: 151}
+      - color: {index: 2, r: 163, g: 73 , b: 164}
+      - color: {index: 3, r: 255, g: 255, b: 255}
+    images: automatic
+
+converts:
+  - name: tilesets
+    palette: global_palette
+    tilesets:
+      tile-width: 16
+      tile-height: 16
+      images:
+        - tilesets/hospital_begin.png
+  - name: rletTilesets
+    palette: global_palette
+    transparent-color-index: 2
+    style: rlet
+    tilesets:
+      tile-width: 16
+      tile-height: 16
+      images:
+        - characters/player.png
+        - characters/playerFlipped.png
+
+outputs:
+  - type: c
+    include-file: gfx.h
+    palettes:
+      - global_palette
+    converts:
+      - tilesets
+      - rletTilesets
