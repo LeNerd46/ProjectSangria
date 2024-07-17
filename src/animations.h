@@ -10,6 +10,8 @@ struct Animation
 	int frameDuration;
 	unsigned char totalFrames;
 
+	Animation() {}
+
 	Animation(gfx_rletsprite_t* framesReference[], int frameDuration, unsigned char totalFrames) : frames(), frameDuration(frameDuration), totalFrames(totalFrames)
 	{
 		for (int i = 0; i < totalFrames; i++)

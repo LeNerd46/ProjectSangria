@@ -6,19 +6,6 @@
 #include "gfx/gfx.h"
 #include "animations.h"
 
-#define TILEMAP_WIDTH 37
-#define TILEMAP_HEIGHT 9
-
-#define TILE_WIDTH 16
-#define TILE_HEIGHT 16
-
-// 21 x 14 for fullscreen (I think?)
-#define TILEMAP_DRAW_WIDTH 21
-#define TILEMAP_DRAW_HEIGHT 9
-
-#define MIDDLE_X (GFX_LCD_WIDTH / 2 - 8)
-#define MIDDLE_Y (GFX_LCD_HEIGHT / 2 - 8)
-
 /*
 * This is a very personal project, and I just want to share my story
 * This story has changed throughout the past few years, and I'm still finding the best way to tell it
@@ -36,6 +23,7 @@
 */
 
 extern unsigned char hospital_begin_map[];
+extern unsigned char hospital_start_room[];
 
 int getDeltaTime()
 {
@@ -48,6 +36,17 @@ int getDeltaTime()
 	previousTime = currentTime;
 	return output;
 }
+
+float easeIn(float time, float startValue, float change, float duration)
+{
+	time /= duration / 2;
+
+	if (time < 1)
+		return change / 2 * time * time + startValue;
+
+	time--;
+	return -change / 2 * (time * (time - 2) - 1) + startValue;
+};
 
 void titleScreen()
 {
@@ -68,229 +67,55 @@ void titleScreen()
 	} while (kb_Data[6] != kb_Clear);
 }
 
-int main()
+void hospitalRoom(Player& player, AnimationManager& manager, int playerId)
 {
-	gfx_Begin();
-	gfx_SetPalette(global_palette, sizeof_global_palette, 0);
-	gfx_SetTransparentColor(2);
-	gfx_SetDrawBuffer();
-
-	titleScreen();
-
-	gfx_FillScreen(0xFF);
-
-	int x = GFX_LCD_WIDTH / 2 - 8;
-	int y = GFX_LCD_HEIGHT / 2 - 8;
-
 	gfx_tilemap_t tilemap;
-	tilemap.map = hospital_begin_map;
-	tilemap.tiles = hospital_begin_tiles;
-	tilemap.type_width = gfx_tile_16_pixel;
-	tilemap.type_height = gfx_tile_16_pixel;
+	tilemap.map = hospital_start_room;
+	tilemap.tiles = hospital_tiles;
+	tilemap.tile_width = gfx_tile_16_pixel;
+	tilemap.tile_height = gfx_tile_16_pixel;
 	tilemap.tile_width = TILE_WIDTH;
 	tilemap.tile_height = TILE_HEIGHT;
-	tilemap.draw_width = TILEMAP_DRAW_WIDTH;
-	tilemap.draw_height = TILEMAP_DRAW_HEIGHT;
-	tilemap.width = TILEMAP_WIDTH;
-	tilemap.height = TILEMAP_HEIGHT;
-	tilemap.x_loc = 0;
-	tilemap.y_loc = TILE_HEIGHT * 3;
+	tilemap.draw_width = 8;
+	tilemap.draw_height = 9;
+	tilemap.width = 8;
+	tilemap.height = 9;
+	tilemap.x_loc = 141;
+	tilemap.y_loc = 200 - (tilemap.height * TILE_HEIGHT);
 
-	unsigned int xOffset = 0;
-	unsigned int yOffset = 0;
+	player.xOffset = 0;
+	player.yOffset = 0;
 
-	unsigned char speed = 3;
-	unsigned char restingPosition{};
+	player.x = 200;
+	player.y = 160;
+
+	player.speed = 1;
+
+	Object door(1, 221, 190, hospitalDoor_width, hospitalDoor_height, false, hospitalDoor); // Beyond the limits of the tilemap, will never collide
+	Object stoolObject(2, 160, 155, stool_width, stool_height, true, stool);
+	Object bed(3, 157, 124, hospitalBedPink_width, hospitalBedPink_height, true, hospitalBedPink);
+	Object shelf(4, 160, 65, hospitalShelf_width, hospitalShelf_height, true, hospitalShelf);
+	Object plant(5, 238, 88, mediumPlant_width, mediumPlant_height, true, mediumPlant);
+	Object rotatedShelf(6, 244, 120, hospitalRotatedShelf_width, hospitalRotatedShelf_height, true, hospitalRotatedShelf);
+
+	Object* objects[] = { &door, &stoolObject, &bed, &shelf, &plant, &rotatedShelf };
 
 	bool debug = false;
-
-	AnimationManager manager;
-
-	gfx_rletsprite_t* playerDownFrames[] = { player_tile_0, player_tile_3, player_tile_0, player_tile_6 };
-	gfx_rletsprite_t* playerUpFrames[] = { player_tile_2, player_tile_5, player_tile_2, player_tile_8 };
-	gfx_rletsprite_t* playerLeftFrames[] = { player_tile_1, player_tile_4, player_tile_7, player_tile_8 };
-	gfx_rletsprite_t* playerRightFrames[] = { playerFlipped_tile_2, playerFlipped_tile_1, playerFlipped_tile_2, playerFlipped_tile_0 };
-
-	Animation playerDown(playerDownFrames, 6, 3);
-	Animation playerUp(playerUpFrames, 6, 3);
-	Animation playerLeft(playerLeftFrames, 6, 3);
-	Animation playerRight(playerRightFrames, 6, 3);
-	int playerId = manager.createAnimation(&playerDown);
-
-	// Door is at 30, 1/2
-	Object door(1, 464, 48, 16, 32, false, nullptr);
-
-	Object* objects[] = { &door };
+	bool stoolThing = false;
+	int timer = 0;
+	float progress;
 
 	do
 	{
 		kb_Scan();
 		manager.update(getDeltaTime());
 
-		// gfx_FillScreen(3);
-		gfx_SetColor(3);
-		gfx_FillRectangle(0, 0, GFX_LCD_WIDTH, 25);
-		gfx_Tilemap(&tilemap, xOffset, yOffset);
+		gfx_FillScreen(0);
+		// gfx_SetColor(3);
+		// gfx_FillRectangle(0, 0, GFX_LCD_WIDTH, 180);
+		gfx_Tilemap(&tilemap, 0, 0);
 
-		if (kb_IsDown(kb_KeyLeft))
-		{
-			if (x >= MIDDLE_X)
-				x -= speed;
-			else if (!xOffset && x >= TILE_WIDTH)
-				x -= speed;
-			else if (xOffset)
-				xOffset -= speed;
-
-			manager.setAnimation(playerId, &playerLeft);
-			gfx_RLETSprite(manager.getCurrentFrame(playerId), x, y);
-
-			restingPosition = 2;
-		}
-		else if (kb_IsDown(kb_KeyRight))
-		{
-			if (x <= MIDDLE_X)
-				x += speed;
-			else if (xOffset < (TILEMAP_WIDTH * TILE_WIDTH) - (TILEMAP_DRAW_WIDTH * TILE_WIDTH))
-				xOffset += speed;
-			else if (x < GFX_LCD_WIDTH)
-				x += speed;
-
-			manager.setAnimation(playerId, &playerRight);
-			gfx_RLETSprite(manager.getCurrentFrame(playerId), x, y);
-
-			restingPosition = 3;
-		}
-		else if (kb_IsDown(kb_KeyUp))
-		{
-			if (y >= MIDDLE_Y)
-				y -= speed;
-			else if (!yOffset && y >= TILE_HEIGHT * 2 + tilemap.y_loc)
-				y -= speed;
-			else if (yOffset)
-				yOffset -= speed;
-
-			manager.setAnimation(playerId, &playerUp);
-			gfx_RLETSprite(manager.getCurrentFrame(playerId), x, y);
-
-			restingPosition = 1;
-		}
-		else if (kb_IsDown(kb_KeyDown))
-		{
-			if (y <= MIDDLE_Y)
-				y += speed;
-			else if (yOffset < (TILEMAP_HEIGHT * TILE_HEIGHT) - (TILEMAP_DRAW_HEIGHT * TILE_HEIGHT))
-				yOffset += speed;
-			else if (y < GFX_LCD_HEIGHT)
-				y += speed;
-
-			manager.setAnimation(playerId, &playerDown);
-			gfx_RLETSprite(manager.getCurrentFrame(playerId), x, y);
-
-			restingPosition = 0;
-		}
-		else
-		{
-			if (restingPosition == 0)
-				gfx_RLETSprite(player_tile_0, x, y);
-			else if (restingPosition == 1)
-				gfx_RLETSprite(player_tile_2, x, y);
-			else if (restingPosition == 2)
-				gfx_RLETSprite(player_tile_1, x, y);
-			else if (restingPosition == 3)
-				gfx_RLETSprite(playerFlipped_tile_2, x, y);
-		}
-
-		if (y >= ((TILE_HEIGHT * TILEMAP_HEIGHT) - (TILEMAP_HEIGHT * 2) - 16) + tilemap.y_loc)
-			y = ((TILE_HEIGHT * TILEMAP_HEIGHT) - (TILEMAP_HEIGHT * 2) - 16) + tilemap.y_loc;
-
-		unsigned int id{};
-		unsigned int smallestDistance = 5000;
-
-		for (unsigned int i = 0; i < 1; i++)
-		{
-			if (debug)
-			{
-				gfx_SetColor(0xE8);
-				gfx_Rectangle(objects[i]->x - xOffset, objects[i]->y - yOffset, objects[i]->width, objects[i]->height);
-
-				gfx_SetColor(0x58);
-				gfx_Line(objects[i]->x + 8 - xOffset, objects[i]->y - yOffset + objects[i]->height - 2, x + 8, y + 2);
-			}
-
-			if (checkCollision(0, 0, GFX_LCD_WIDTH, GFX_LCD_HEIGHT, objects[i]->x - xOffset, objects[i]->y - yOffset, objects[i]->width, objects[i]->height))
-			{
-				if (objects[i]->sprite != nullptr)
-					gfx_RLETSprite(objects[i]->sprite, objects[i]->x - xOffset, objects[i]->y - yOffset);
-
-
-				unsigned int distanceToObject = distance(x, y, objects[i]->x - xOffset, objects[i]->y - yOffset);
-
-				if (distanceToObject > 50)
-					continue;
-
-				if (distanceToObject < smallestDistance)
-				{
-					smallestDistance = distanceToObject;
-					id = objects[i]->id;
-				}
-			}
-		}
-
-		gfx_SetColor(3);
-		gfx_FillRectangle(95, 205, 150, 15);
-
-		if (restingPosition == 1 && checkCollision(x, y, 16, 16, objects[id - 1]->x - xOffset - 4, objects[id - 1]->y - yOffset - 4, objects[id - 1]->width + 6, objects[id - 1]->height + 8))
-		{
-			gfx_SetTextFGColor(0);
-			gfx_PrintStringXY("Press [2nd] to enter", 100, 210);
-		}
-
-		if (id != 0 && objects[id - 1]->collidable)
-		{
-			unsigned char collision = checkCollisionSide(x, y, 16, 16, objects[id - 1]->x - xOffset + objects[id - 1]->xOffset, objects[id - 1]->y - yOffset + objects[id - 1]->yOffset, objects[id - 1]->width, objects[id - 1]->height);
-
-			// I'm sure there's a better way to do this but you know what, this works so I don't want to hear it
-			switch (collision)
-			{
-			case 3: // Above
-				if (y <= MIDDLE_Y)
-					y -= speed;
-				else if (yOffset < (TILEMAP_HEIGHT * TILE_HEIGHT) - (TILEMAP_DRAW_HEIGHT * TILE_HEIGHT))
-					yOffset -= speed;
-				else if (y < GFX_LCD_HEIGHT)
-					y -= speed;
-				break;
-
-			case 4: // Below
-				if (y >= MIDDLE_Y)
-					y += speed;
-				else if (!yOffset && y >= TILE_HEIGHT * 2 + tilemap.y_loc)
-					y += speed;
-				else if (yOffset)
-					yOffset += speed;
-				break;
-
-			case 2: // Right
-				if (x >= MIDDLE_X)
-					x += speed;
-				else if (!xOffset && x >= TILE_WIDTH)
-					x += speed;
-				else if (xOffset)
-					xOffset += speed;
-				break;
-
-			case 1: // Left
-				if (x <= MIDDLE_X)
-					x -= speed;
-				else if (xOffset < (TILEMAP_WIDTH * TILE_WIDTH) - (TILEMAP_DRAW_WIDTH * TILE_WIDTH))
-					xOffset -= speed;
-				else if (x < GFX_LCD_WIDTH)
-					x -= speed;
-				break;
-			}
-		}
-
-		smallestDistance = 5000;
+		drawPlayerSingle(player, manager, playerId, tilemap);
 
 		if (getKeyDown(kb_KeyAlpha))
 		{
@@ -303,7 +128,273 @@ int main()
 			gfx_PrintStringXY("Debug", 270, 5);
 
 			gfx_SetColor(0xE8);
-			gfx_Rectangle(x, y, 16, 16);
+			gfx_Rectangle(player.x, player.y, 16, 16);
+		}
+
+		int id = checkObjectCollision(player, objects, tilemap, 6, true, 40, debug);
+
+		switch (id)
+		{
+		case 2:
+
+			gfx_SetTextFGColor(3);
+			gfx_PrintStringXY("Press [2nd] to sit", 80, 210);
+
+			if (getKeyDown(kb_Key2nd))
+			{
+				player.control = false;
+				stoolObject.collidable = false;
+
+				player.x = 160;
+				player.y = 148;
+				player.restingPosition = 3;
+
+				stoolThing = true;
+				progress = 0;
+			}
+
+			break;
+		}
+
+		if (stoolThing)
+		{
+			gfx_RLETSprite(playerFlipped_tile_2, player.x, player.y);
+
+			timer++;
+
+			gfx_SetTextXY(5, 5);
+			gfx_PrintInt(timer, 1);
+
+			if (timer >= 50 && tilemap.x_loc < GFX_LCD_WIDTH)
+			{
+				tilemap.x_loc += 2;
+				player.x += 2;
+
+				for (unsigned char i = 0; i < 6; i++)
+				{
+					objects[i]->x += 2;
+				}
+
+			}
+			else if (tilemap.x_loc >= GFX_LCD_WIDTH)
+			{
+
+			}
+		}
+
+		gfx_SwapDraw();
+
+	} while (kb_Data[6] != kb_Clear);
+}
+
+int main()
+{
+	gfx_Begin();
+	gfx_SetPalette(global_palette, sizeof_global_palette, 0);
+	gfx_SetTransparentColor(2);
+	gfx_SetDrawBuffer();
+
+	titleScreen();
+
+	gfx_FillScreen(0xFF);
+
+	// int x = GFX_LCD_WIDTH / 2 - 8;
+	// int y = GFX_LCD_HEIGHT / 2 - 8;
+
+	Player player;
+
+	gfx_tilemap_t tilemap;
+	tilemap.map = hospital_begin_map;
+	tilemap.tiles = hospital_tiles;
+	tilemap.type_width = gfx_tile_16_pixel;
+	tilemap.type_height = gfx_tile_16_pixel;
+	tilemap.tile_width = TILE_WIDTH;
+	tilemap.tile_height = TILE_HEIGHT;
+	tilemap.draw_width = TILEMAP_DRAW_WIDTH;
+	tilemap.draw_height = TILEMAP_DRAW_HEIGHT;
+	tilemap.width = TILEMAP_WIDTH;
+	tilemap.height = TILEMAP_HEIGHT;
+	tilemap.x_loc = 0;
+	tilemap.y_loc = TILE_HEIGHT * 3;
+
+	bool debug = false;
+
+	AnimationManager manager;
+	int playerId = manager.createAnimation(&player.playerDown);
+
+	// Door is at 30, 1/2
+	Object realDoor(1, 480, 52, hospitalDoor_width, hospitalDoor_height, false, hospitalDoor);
+	Object door1(5, 96, 52, hospitalDoor_width, hospitalDoor_height, false, hospitalDoor);
+	Object door2(2, 192, 52, hospitalDoor_width, hospitalDoor_height, false, hospitalDoor);
+	Object door3(3, 288, 52, hospitalDoor_width, hospitalDoor_height, false, hospitalDoor);
+	Object door4(4, 384, 52, hospitalDoor_width, hospitalDoor_height, false, hospitalDoor);
+
+	Object* objects[] = { &realDoor, &door4, &door3, &door2, &door1 };
+	const char amountOfObjects = 5;
+
+	// hospitalRoom(player, manager, playerId);
+
+	do
+	{
+		kb_Scan();
+		manager.update(getDeltaTime());
+
+		gfx_FillScreen(0);
+		// gfx_SetColor(3);
+		// gfx_FillRectangle(0, 0, GFX_LCD_WIDTH, 25);
+		gfx_Tilemap(&tilemap, player.xOffset, player.yOffset);
+
+		drawPlayer(player, manager, playerId);
+
+		if (player.y >= ((TILE_HEIGHT * TILEMAP_HEIGHT) - (TILEMAP_HEIGHT * 2) - 16) + tilemap.y_loc)
+			player.y = ((TILE_HEIGHT * TILEMAP_HEIGHT) - (TILEMAP_HEIGHT * 2) - 16) + tilemap.y_loc;
+
+		unsigned int id{};
+		unsigned int smallestDistance = 60;
+
+		for (unsigned int i = 0; i < amountOfObjects; i++)
+		{
+			if (checkCollision(0, 0, GFX_LCD_WIDTH, GFX_LCD_HEIGHT, objects[i]->x - player.xOffset + player.horizontalVelocity, objects[i]->y - player.yOffset + player.verticalVelocity, objects[i]->width, objects[i]->height))
+			{
+				if (objects[i]->sprite != nullptr)
+					gfx_RLETSprite(objects[i]->sprite, objects[i]->x - player.xOffset + player.horizontalVelocity, objects[i]->y - player.yOffset + player.verticalVelocity);
+
+				unsigned int distanceToObject = distance(player.x, player.y, objects[i]->x - player.xOffset + player.horizontalVelocity, objects[i]->y - player.yOffset + player.verticalVelocity);
+
+				if (distanceToObject > 50)
+					continue;
+
+				if (distanceToObject < smallestDistance)
+				{
+					smallestDistance = distanceToObject;
+					id = objects[i]->id;
+				}
+			}
+		}
+
+		if (debug && id != 0)
+		{
+			gfx_SetColor(0xE8);
+			gfx_Rectangle(objects[id - 1]->x - player.xOffset, objects[id - 1]->y - player.yOffset, objects[id - 1]->width, objects[id - 1]->height);
+
+			gfx_SetColor(0x58);
+			gfx_Line(objects[id - 1]->x + 8 - player.xOffset, objects[id - 1]->y - player.yOffset + objects[id - 1]->height - 2, player.x + 8, player.y + 2);
+			gfx_Rectangle(objects[id - 1]->x - player.xOffset - 4, objects[id - 1]->y - player.yOffset - 4, objects[id - 1]->width + 6, objects[id - 1]->height + 8);
+		}
+
+		// gfx_SetColor(3);
+		// gfx_FillRectangle(95, 205, 150, 15);
+
+		if (player.restingPosition == 1 && checkCollision(player.x, player.y, 16, 16, objects[id - 1]->x - player.xOffset - 4, objects[id - 1]->y - player.yOffset - 4, objects[id - 1]->width + 6, objects[id - 1]->height + 8))
+		{
+			if (id == 1)
+			{
+				gfx_SetTextFGColor(3);
+				gfx_PrintStringXY("Press [2nd] to enter", 100, 210);
+
+				if (getKeyDown(kb_Key2nd))
+				{
+					gfx_SetTextFGColor(3);
+					gfx_PrintStringXY("You pressed [2nd]", 110, 30);
+
+					switch (id)
+					{
+					case 1:
+
+						int elapsedTime{};
+
+						// It's at 48 right now
+						while (tilemap.y_loc < 200)
+						{
+							elapsedTime += 1;
+
+							if (elapsedTime >= 10)
+							{
+								elapsedTime = 0;
+								tilemap.y_loc += 2;
+
+								gfx_FillScreen(0);
+								gfx_Tilemap(&tilemap, player.xOffset, player.yOffset);
+
+								for (unsigned char i = 0; i < amountOfObjects; i++)
+								{
+									objects[i]->y += 2;
+
+									if (objects[i]->sprite != nullptr)
+										gfx_RLETSprite(objects[i]->sprite, objects[i]->x - player.xOffset + player.horizontalVelocity, objects[i]->y - player.yOffset + player.verticalVelocity);
+								}
+
+								gfx_SwapDraw();
+							}
+						}
+
+						hospitalRoom(player, manager, playerId);
+
+						break;
+					}
+				}
+			}
+		}
+
+		if (id != 0 && objects[id - 1]->collidable)
+		{
+			unsigned char collision = checkCollisionSide(player.x, player.y, 16, 16, objects[id - 1]->x - player.xOffset + objects[id - 1]->xOffset, objects[id - 1]->y - player.yOffset + objects[id - 1]->yOffset, objects[id - 1]->width, objects[id - 1]->height);
+
+			// I'm sure there's a better way to do this but you know what, this works so I don't want to hear it
+			switch (collision)
+			{
+			case 3: // Above
+				if (player.y <= MIDDLE_Y)
+					player.y -= player.speed;
+				else if (player.yOffset < (TILEMAP_HEIGHT * TILE_HEIGHT) - (TILEMAP_DRAW_HEIGHT * TILE_HEIGHT))
+					player.yOffset -= player.speed;
+				else if (player.y < GFX_LCD_HEIGHT)
+					player.y -= player.speed;
+				break;
+
+			case 4: // Below
+				if (player.y >= MIDDLE_Y)
+					player.y += player.speed;
+				else if (!player.yOffset && player.y >= TILE_HEIGHT * 2 + tilemap.y_loc)
+					player.y += player.speed;
+				else if (player.yOffset)
+					player.yOffset += player.speed;
+				break;
+
+			case 2: // Right
+				if (player.x >= MIDDLE_X)
+					player.x += player.speed;
+				else if (!player.xOffset && player.x >= TILE_WIDTH)
+					player.x += player.speed;
+				else if (player.xOffset)
+					player.xOffset += player.speed;
+				break;
+
+			case 1: // Left
+				if (player.x <= MIDDLE_X)
+					player.x -= player.speed;
+				else if (player.xOffset < (TILEMAP_WIDTH * TILE_WIDTH) - (TILEMAP_DRAW_WIDTH * TILE_WIDTH))
+					player.xOffset -= player.speed;
+				else if (player.x < GFX_LCD_WIDTH)
+					player.x -= player.speed;
+				break;
+			}
+		}
+
+		smallestDistance = 60;
+
+		if (getKeyDown(kb_KeyAlpha))
+		{
+			debug = !debug;
+			gfx_FillScreen(3);
+		}
+
+		if (debug)
+		{
+			gfx_PrintStringXY("Debug", 270, 5);
+
+			gfx_SetColor(0xE8);
+			gfx_Rectangle(player.x, player.y, 16, 16);
 		}
 
 		gfx_SetTextFGColor(12);

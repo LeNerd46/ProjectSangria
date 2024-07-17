@@ -14,7 +14,7 @@ converts:
       tile-width: 16
       tile-height: 16
       images:
-        - tilesets/hospital_begin.png
+        - tilesets/hospital.png
   - name: rletTilesets
     palette: global_palette
     transparent-color-index: 2
@@ -25,6 +25,17 @@ converts:
       images:
         - characters/player.png
         - characters/playerFlipped.png
+  - name: objects
+    palette: global_palette
+    transparent-color-index: 2
+    style: rlet
+    images:
+      - objects/hospital/hospitalDoor.png
+      - objects/hospital/stool.png
+      - objects/hospital/hospitalBedPink.png
+      - objects/hospital/hospitalShelf.png
+      - objects/hospital/mediumPlant.png
+      - objects/hospital/hospitalRotatedShelf.png
 
 outputs:
   - type: c
@@ -34,3 +45,4 @@ outputs:
     converts:
       - tilesets
       - rletTilesets
+      - objects
